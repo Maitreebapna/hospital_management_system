@@ -254,30 +254,10 @@
             </div>
         </transition>
 
-        <!-- Floating Theme Customizer -->
-        <button class="theme-customizer-trigger" @click="showThemeCustomizer = !showThemeCustomizer" title="Customize Theme">
-            <i class="bi bi-gear-fill"></i>
+        <!-- Floating Theme Toggle (Light/Dark Mode only) -->
+        <button class="theme-customizer-trigger" @click="toggleDarkMode" :title="isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
+            <i class="bi" :class="isDarkMode ? 'bi-sun-fill text-warning' : 'bi-moon-fill text-white'"></i>
         </button>
-        <transition name="fade">
-            <div class="theme-customizer-panel" v-if="showThemeCustomizer">
-                <h6 class="fw-bold mb-2 small text-uppercase text-muted">Accent Color</h6>
-                <div class="color-dot-container">
-                    <div class="color-dot" 
-                         v-for="color in themePresets" 
-                         :key="color.name"
-                         :style="{backgroundColor: color.hex}"
-                         :class="{active: activeAccent === color.name}"
-                         @click="setAccent(color.name)"
-                         :title="color.label">
-                        <i class="bi bi-check-lg" v-if="activeAccent === color.name"></i>
-                    </div>
-                </div>
-                <button class="mode-toggle-btn" @click="toggleDarkMode">
-                    <span class="small">{{ isDarkMode ? 'Light Mode' : 'Dark Mode' }}</span>
-                    <i class="bi" :class="isDarkMode ? 'bi-sun-fill text-warning' : 'bi-moon-fill text-primary'"></i>
-                </button>
-            </div>
-        </transition>
     </div>
 </template>
 
@@ -293,18 +273,7 @@ export default {
             history: [],
             rescheduleData: null, rescheduleForm: { date: '', time_slot: '' },
             currentTab: 'booking',
-            showThemeCustomizer: false,
-            isDarkMode: false,
-            activeAccent: 'sky',
-            themePresets: [
-                { name: 'indigo', label: 'Indigo', hex: '#6366f1' },
-                { name: 'teal', label: 'Teal', hex: '#14b8a6' },
-                { name: 'sky', label: 'Sky Blue', hex: '#0ea5e9' },
-                { name: 'emerald', label: 'Emerald Mint', hex: '#10b981' },
-                { name: 'rose', label: 'Sunset Rose', hex: '#f43f5e' },
-                { name: 'amber', label: 'Sunset Gold', hex: '#f59e0b' },
-                { name: 'purple', label: 'Royal Purple', hex: '#8b5cf6' }
-            ]
+            isDarkMode: false
         }
     },
     methods: {
@@ -434,10 +403,6 @@ export default {
             } else {
                 document.body.classList.remove('dark-theme');
             }
-
-            const accent = localStorage.getItem('theme-accent') || this.activeAccent;
-            this.activeAccent = accent;
-            this.applyAccentClass(accent);
         },
         toggleDarkMode() {
             this.isDarkMode = !this.isDarkMode;
@@ -447,16 +412,6 @@ export default {
             } else {
                 document.body.classList.remove('dark-theme');
             }
-        },
-        setAccent(accent) {
-            this.activeAccent = accent;
-            localStorage.setItem('theme-accent', accent);
-            this.applyAccentClass(accent);
-        },
-        applyAccentClass(accent) {
-            const prefixes = ['accent-indigo', 'accent-teal', 'accent-sky', 'accent-emerald', 'accent-rose', 'accent-amber', 'accent-purple'];
-            prefixes.forEach(p => document.body.classList.remove(p));
-            document.body.classList.add('accent-' + accent);
         }
     },
     mounted() {
