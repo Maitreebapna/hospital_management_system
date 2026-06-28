@@ -7,7 +7,7 @@
                 <div class="sidebar-brand">
                     <div>
                         <span class="fw-bold tracking-tight text-white fs-4 d-block">HMS Patient</span>
-                        <span class="text-muted small" style="font-size: 11px !important;">Patient Portal</span>
+                        <span class="text-muted small" style="font-size: 11px !important;">{{ patientName }}'s Portal</span>
                     </div>
                 </div>
                 
@@ -27,9 +27,9 @@
             <!-- User Profile & Logout at Bottom -->
             <div class="sidebar-footer-profile">
                 <div class="d-flex align-items-center gap-2">
-                    <div class="sidebar-avatar">P</div>
+                    <div class="sidebar-avatar">{{ patientName.charAt(0).toUpperCase() }}</div>
                     <div>
-                        <span class="text-white fw-bold d-block small">Patient Portal</span>
+                        <span class="text-white fw-bold d-block small">{{ patientName }} Portal</span>
                         <span class="text-muted small d-block" style="font-size: 10px !important;">Active Session</span>
                     </div>
                 </div>
@@ -71,14 +71,12 @@
                                     <div>
                                         <label class="form-label mb-1 text-secondary small fw-bold">Phone Number</label>
                                         <div class="input-icon-wrapper">
-                                            <i class="bi bi-telephone input-icon"></i>
                                             <input type="text" class="form-control" v-model="profileForm.contact" placeholder="Enter phone number">
                                         </div>
                                     </div>
                                     <div>
                                         <label class="form-label mb-1 text-secondary small fw-bold">Home Address</label>
                                         <div class="input-icon-wrapper">
-                                            <i class="bi bi-geo-alt input-icon"></i>
                                             <input type="text" class="form-control" v-model="profileForm.address" placeholder="Enter home address">
                                         </div>
                                     </div>
@@ -151,7 +149,6 @@
                                         <div>
                                             <label class="form-label text-secondary small fw-bold">Preferred Time Slot</label>
                                             <div class="input-icon-wrapper">
-                                                <i class="bi bi-clock input-icon"></i>
                                                 <input type="text" class="form-control" v-model="bookForm.time_slot" placeholder="e.g. 10:30 AM" required>
                                             </div>
                                         </div>
@@ -173,9 +170,30 @@
             <div v-show="currentTab === 'records'" class="fade-in-up">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h3 class="mb-0 fw-bold font-heading text-primary">Your Medical Records</h3>
-                    <button class="btn btn-sm btn-outline-primary px-3 rounded-pill" @click="exportData">
-                        <i class="bi bi-download me-1"></i>Export CSV
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-success px-3 rounded-pill fw-bold" @click="triggerCSVExport" title="Export medical history to CSV via background batch job">
+                            <i class="bi bi-file-earmark-spreadsheet me-1"></i>Download Records (CSV)
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary px-3 rounded-pill fw-bold" @click="exportData">
+                            <i class="bi bi-file-pdf me-1"></i>Export PDF Report
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Next Upcoming Appointment Alert Banner -->
+                <div v-if="nextUpcomingAppointment" class="alert alert-primary border-0 shadow-sm p-4 mb-4 rounded-4 d-flex align-items-center justify-content-between fade-in-up" style="background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); border-left: 6px solid #0284c7 !important;">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                            <i class="bi bi-calendar-check-fill fs-4"></i>
+                        </div>
+                        <div>
+                            <span class="text-primary fw-bold text-uppercase small tracking-wider d-block mb-1">Next Upcoming Appointment</span>
+                            <h5 class="fw-extrabold text-dark mb-0">
+                                Dr. {{ nextUpcomingAppointment.doctor_name }} on {{ nextUpcomingAppointment.date }} @ {{ nextUpcomingAppointment.time_slot }}
+                            </h5>
+                        </div>
+                    </div>
+                    <span class="badge bg-primary text-white px-3 py-2 rounded-pill fw-bold text-uppercase fs-6">Booked</span>
                 </div>
 
                 <div class="row g-4">
@@ -226,6 +244,70 @@
             </div>
         </div>
 
+        <!-- Checkout Overlay Modal -->
+        <transition name="fade">
+            <div v-if="showCheckout" class="reschedule-overlay d-flex align-items-center justify-content-center">
+                <div class="card border-0 shadow-lg p-2 reschedule-card rounded-4 bg-pastel-blue">
+                    <div class="card-header bg-transparent border-0 pt-4 pb-2 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-credit-card-2-front me-2"></i>Consultation Checkout</h5>
+                        <button type="button" class="btn-close" @click="closeCheckout"></button>
+                    </div>
+                    <div class="card-body">
+                        <div class="checkout-summary bg-light rounded-3 p-3 mb-4 border border-dashed border-secondary">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted small">Provider</span>
+                                <strong class="text-dark">{{ checkoutData.doctor_name }}</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted small">Specialty</span>
+                                <span class="badge bg-secondary font-heading rounded-pill">{{ checkoutData.specialization }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted small">Date & Time</span>
+                                <strong class="text-dark">{{ bookForm.date }} @ {{ bookForm.time_slot }}</strong>
+                            </div>
+                            <hr class="my-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-bold text-dark">Consultation Fee</span>
+                                <h4 class="text-primary fw-extrabold mb-0">₹{{ checkoutData.amount ? checkoutData.amount.toFixed(2) : '50.00' }}</h4>
+                            </div>
+                        </div>
+
+                        <form @submit.prevent="processPayment" class="d-flex flex-column gap-3">
+                            <div>
+                                <label class="form-label text-secondary small fw-bold">Cardholder Name</label>
+                                <div class="input-icon-wrapper">
+                                    <input type="text" class="form-control" v-model="cardForm.cardholder" placeholder="John Doe" required>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="form-label text-secondary small fw-bold">Card Number</label>
+                                <div class="input-icon-wrapper">
+                                    <input type="text" class="form-control" v-model="cardForm.number" placeholder="1234567812345678" pattern="\d{16}" title="16-digit card number" required>
+                                </div>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label class="form-label text-secondary small fw-bold">Expiry Date</label>
+                                    <input type="text" class="form-control" v-model="cardForm.expiry" placeholder="MM/YY" pattern="(0[1-9]|1[0-2])\/\d{2}" title="MM/YY format" required>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label text-secondary small fw-bold">CVV</label>
+                                    <input type="password" class="form-control" v-model="cardForm.cvv" placeholder="•••" pattern="\d{3,4}" title="3 or 4 digit CVV" required>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100 py-3 text-white fw-bold mt-3 shadow" :disabled="paymentProcessing">
+                                <span v-if="paymentProcessing" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span v-if="paymentProcessing">Authorizing Transaction...</span>
+                                <span v-else><i class="bi bi-lock-fill me-1"></i>Pay & Confirm Booking</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
         <!-- Reschedule Overlay Modal -->
         <transition name="fade">
             <div v-if="rescheduleData" class="reschedule-overlay d-flex align-items-center justify-content-center">
@@ -266,6 +348,7 @@ export default {
     data() {
         return {
             token: localStorage.getItem('access_token'),
+            patientName: localStorage.getItem('username') || 'Patient',
             error: '', success: '',
             searchQuery: '', searchResults: [], targetDoctor: null, departments: [],
             bookForm: { date: '', time_slot: '' },
@@ -273,7 +356,26 @@ export default {
             history: [],
             rescheduleData: null, rescheduleForm: { date: '', time_slot: '' },
             currentTab: 'booking',
-            isDarkMode: false
+            isDarkMode: false,
+            showCheckout: false,
+            checkoutData: { amount: 0, doctor_name: '', specialization: '', appointment_id: null, order_id: '' },
+            cardForm: { cardholder: '', number: '', expiry: '', cvv: '' },
+            paymentProcessing: false
+        }
+    },
+    computed: {
+        nextUpcomingAppointment() {
+            if (!this.history || this.history.length === 0) return null;
+            const todayStr = new Date().toISOString().split('T')[0];
+            const upcoming = this.history.filter(h => h.status === 'Booked' && h.date >= todayStr);
+            if (upcoming.length === 0) return null;
+            
+            upcoming.sort((a, b) => {
+                const dateCompare = a.date.localeCompare(b.date);
+                if (dateCompare !== 0) return dateCompare;
+                return a.time_slot.localeCompare(b.time_slot);
+            });
+            return upcoming[0];
         }
     },
     methods: {
@@ -316,18 +418,54 @@ export default {
             }
 
             const payload = { doctor_id: this.targetDoctor.id, ...this.bookForm };
-            const res = await fetch('http://127.0.0.1:5000/api/patient/appointments/book', {
-                method: 'POST', headers: this.authHeader(), body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-
-            if (res.ok) {
-                this.showMsg('success', "Booked successfully!");
-                this.targetDoctor = null;
-                this.bookForm = { date: '', time_slot: '' };
-                this.fetchHistory(); 
-            } else {
-                this.showMsg('error', data.message);
+            try {
+                const res = await fetch('http://127.0.0.1:5000/api/payments/create-order', {
+                    method: 'POST', headers: this.authHeader(), body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    this.checkoutData = data;
+                    this.showCheckout = true;
+                    this.cardForm = { cardholder: '', number: '', expiry: '', cvv: '' };
+                } else {
+                    this.showMsg('error', data.message);
+                }
+            } catch {
+                this.showMsg('error', "Failed to initialize checkout.");
+            }
+        },
+        closeCheckout() {
+            this.showCheckout = false;
+            this.checkoutData = { amount: 0, doctor_name: '', specialization: '', appointment_id: null, order_id: '' };
+        },
+        async processPayment() {
+            this.paymentProcessing = true;
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            try {
+                const transactionId = 'MOCK-TXN-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+                const payload = {
+                    appointment_id: this.checkoutData.appointment_id,
+                    order_id: this.checkoutData.order_id,
+                    transaction_id: transactionId,
+                    cardholder_name: this.cardForm.cardholder
+                };
+                const res = await fetch('http://127.0.0.1:5000/api/payments/verify', {
+                    method: 'POST', headers: this.authHeader(), body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                this.paymentProcessing = false;
+                if (res.ok) {
+                    this.showMsg('success', "Payment Successful! Appointment confirmed.");
+                    this.showCheckout = false;
+                    this.targetDoctor = null;
+                    this.bookForm = { date: '', time_slot: '' };
+                    this.fetchHistory();
+                } else {
+                    this.showMsg('error', data.message);
+                }
+            } catch {
+                this.paymentProcessing = false;
+                this.showMsg('error', "Payment verification failed.");
             }
         },
         async exportData() {
@@ -337,13 +475,26 @@ export default {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'Patient_Medical_History_Report.csv';
+                a.download = 'Medical_History_Report.pdf';
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
-                this.showMsg('success', "Medical Record downloaded!");
+                this.showMsg('success', "Medical Record PDF downloaded!");
             } else {
-                this.showMsg('error', "Failed to download medical records.");
+                this.showMsg('error', "Failed to download medical report PDF.");
+            }
+        },
+        async triggerCSVExport() {
+            try {
+                const res = await fetch('http://127.0.0.1:5000/api/patient/export-csv', { method: 'POST', headers: this.authHeader() });
+                const data = await res.json();
+                if (res.ok) {
+                    this.showMsg('success', data.message);
+                } else {
+                    this.showMsg('error', data.message || "Failed to trigger CSV export.");
+                }
+            } catch (e) {
+                this.showMsg('error', "Network error triggering CSV export.");
             }
         },
         async updateProfile() {
@@ -446,9 +597,7 @@ export default {
     font-size: 16px;
 }
 
-.input-icon-wrapper .form-control {
-    padding-left: 42px;
-}
+/* Padding left removed for plain inputs */
 
 .treatment-box {
     border-left: 4px solid var(--theme-primary) !important;

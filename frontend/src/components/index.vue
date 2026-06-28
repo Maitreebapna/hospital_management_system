@@ -56,16 +56,14 @@
                         <div class="form-group-custom">
                             <label class="form-label text-secondary small fw-bold">Email Address</label>
                             <div class="input-icon-wrapper">
-                                <i class="bi bi-envelope input-icon"></i>
-                                <input type="email" class="form-control" v-model="loginForm.email" placeholder="name@example.com" required autocomplete="email">
+                                <input type="email" class="form-control" v-model="loginForm.email" placeholder="" required autocomplete="email">
                             </div>
                         </div>
 
                         <div class="form-group-custom">
                             <label class="form-label text-secondary small fw-bold">Password</label>
                             <div class="input-icon-wrapper">
-                                <i class="bi bi-lock input-icon"></i>
-                                <input type="password" class="form-control" v-model="loginForm.password" placeholder="••••••••" required autocomplete="current-password">
+                                <input type="password" class="form-control" v-model="loginForm.password" placeholder="" required autocomplete="current-password">
                             </div>
                         </div>
 
@@ -79,40 +77,35 @@
                         <div class="form-group-custom">
                             <label class="form-label text-secondary small fw-bold">Full Name</label>
                             <div class="input-icon-wrapper">
-                                <i class="bi bi-person input-icon"></i>
-                                <input type="text" class="form-control" v-model="registerForm.username" placeholder="John Doe" required autocomplete="name">
+                                <input type="text" class="form-control" v-model="registerForm.username" required autocomplete="name">
                             </div>
                         </div>
 
                         <div class="form-group-custom">
                             <label class="form-label text-secondary small fw-bold">Email Address</label>
                             <div class="input-icon-wrapper">
-                                <i class="bi bi-envelope input-icon"></i>
-                                <input type="email" class="form-control" v-model="registerForm.email" placeholder="john.doe@example.com" required autocomplete="email">
+                                <input type="email" class="form-control" v-model="registerForm.email" required autocomplete="email">
                             </div>
                         </div>
 
                         <div class="form-group-custom">
                             <label class="form-label text-secondary small fw-bold">Phone Number</label>
                             <div class="input-icon-wrapper">
-                                <i class="bi bi-telephone input-icon"></i>
-                                <input type="text" class="form-control" v-model="registerForm.contact" pattern="[0-9]+" minlength="7" placeholder="e.g. 9876543210" required autocomplete="tel">
+                                <input type="text" class="form-control" v-model="registerForm.contact" pattern="[0-9]+" minlength="7" required autocomplete="tel">
                             </div>
                         </div>
 
                         <div class="form-group-custom">
                             <label class="form-label text-secondary small fw-bold">Home Address</label>
                             <div class="input-icon-wrapper">
-                                <i class="bi bi-geo-alt input-icon"></i>
-                                <input type="text" class="form-control" v-model="registerForm.address" placeholder="123 Main St, City" autocomplete="street-address">
+                                <input type="text" class="form-control" v-model="registerForm.address" autocomplete="street-address">
                             </div>
                         </div>
 
                         <div class="form-group-custom">
                             <label class="form-label text-secondary small fw-bold">Create Password</label>
                             <div class="input-icon-wrapper">
-                                <i class="bi bi-lock input-icon"></i>
-                                <input type="password" class="form-control" v-model="registerForm.password" minlength="6" placeholder="At least 6 characters" required autocomplete="new-password">
+                                <input type="password" class="form-control" v-model="registerForm.password" minlength="6" required autocomplete="new-password">
                             </div>
                         </div>
 
@@ -160,6 +153,7 @@ export default {
                 if (res.ok) {
                     localStorage.setItem('access_token', data.access_token);
                     localStorage.setItem('role', data.role);
+                    localStorage.setItem('username', data.username);
                     this.showMsg('success', 'Login Successful!');
                     setTimeout(() => {
                         if (data.role === 'Admin') window.location.href = 'admin/admin_dashboard.html';
@@ -248,7 +242,6 @@ export default {
 }
 
 .input-icon-wrapper .form-control {
-    padding-left: 42px;
     background-color: #f8fafc;
     border-color: #e2e8f0;
 }

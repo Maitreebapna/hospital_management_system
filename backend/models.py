@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 
@@ -45,6 +46,8 @@ class Doctor(db.Model):
     specialization = db.Column(db.String(100))
     availability = db.Column(db.String(255))
     time_availability = db.Column(db.String(100), default='10:00 AM - 09:00 PM')
+    consultation_fee = db.Column(db.Float, nullable=False, default=50.0)
+    contact = db.Column(db.String(15))
     
     appointments = db.relationship('Appointment', backref='doctor', lazy=True, cascade='all, delete-orphan')
 
@@ -54,6 +57,7 @@ class Patient(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     contact = db.Column(db.String(15))
     address = db.Column(db.String(255))
+    registration_date = db.Column(db.String(10), default=lambda: datetime.now().strftime('%Y-%m-%d'))
     
     appointments = db.relationship('Appointment', backref='patient', lazy=True, cascade='all, delete-orphan')
 
@@ -75,3 +79,14 @@ class Treatment(db.Model):
     diagnosis = db.Column(db.Text)
     prescription = db.Column(db.Text)
     notes = db.Column(db.Text)
+
+class Payment(db.Model):
+    __tablename__ = 'payments'
+    id = db.Column(db.Integer, primary_key=True)
+    appointment_id = db.Column(db.Integer, db.ForeignKey('appointments.id'), nullable=True)
+    amount = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(20), default='Pending')  # Pending, Completed, Failed
+    transaction_id = db.Column(db.String(100), unique=True, nullable=True)
+    created_at = db.Column(db.DateTime, default=db.func.now())
+
+    appointment = db.relationship('Appointment', backref=db.backref('payments', lazy=True, cascade='all, delete-orphan'))

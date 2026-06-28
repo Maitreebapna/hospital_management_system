@@ -19,6 +19,9 @@ from flask_jwt_extended import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from sqlalchemy import func
+import uuid
+
 from models import (
     Treatment,
     db,
@@ -27,7 +30,8 @@ from models import (
     Patient,
     Doctor,
     Department,
-    Appointment
+    Appointment,
+    Payment
 )
 
 app = Flask(__name__, template_folder='../frontend', static_folder='../frontend', static_url_path='')
@@ -213,25 +217,70 @@ def get_departments():
 @app.route('/api/admin/dashboard', methods=['GET'])
 @admin_required
 def admin_dashboard_stats():
-    cache_key = "admin_dashboard_stats"
-    cached = cache.get(cache_key)
-    if cached:
-        print("\n[CACHE HIT] Admin dashboard loaded\n")
-        return jsonify(cached), 200
-    
+    # Fetch total counts
     total_patients = Patient.query.count()
     total_doctors = Doctor.query.count()
     total_appointments = Appointment.query.count()
     
+    # Calculate Total Revenue from Completed payments
+    total_revenue = db.session.query(func.sum(Payment.amount)).filter(Payment.status == 'Completed').scalar() or 0.0
+    
+    # Calculate Monthly Booking Trends (past 6 months)
+    six_months_ago = datetime.now().date() - timedelta(days=180)
+    monthly_trends_query = db.session.query(
+        func.strftime('%Y-%m', Appointment.date),
+        func.count(Appointment.id)
+    ).filter(
+        Appointment.date >= six_months_ago
+    ).group_by(
+        func.strftime('%Y-%m', Appointment.date)
+    ).order_by(
+        func.strftime('%Y-%m', Appointment.date).asc()
+    ).all()
+    monthly_trends = [{'month': m[0], 'count': m[1]} for m in monthly_trends_query]
+    
+    # Calculate Monthly Revenue Trends (past 6 months)
+    monthly_revenue_query = db.session.query(
+        func.strftime('%Y-%m', Payment.created_at),
+        func.sum(Payment.amount)
+    ).filter(
+        Payment.status == 'Completed',
+        Payment.created_at >= six_months_ago
+    ).group_by(
+        func.strftime('%Y-%m', Payment.created_at)
+    ).order_by(
+        func.strftime('%Y-%m', Payment.created_at).asc()
+    ).all()
+    monthly_revenue = [{'month': r[0], 'amount': r[1]} for r in monthly_revenue_query]
+    
+    # Calculate Daily Appointment Volumes (past 14 days)
+    fourteen_days_ago = datetime.now().date() - timedelta(days=14)
+    daily_volumes_query = db.session.query(
+        Appointment.date,
+        func.count(Appointment.id)
+    ).filter(
+        Appointment.date >= fourteen_days_ago
+    ).group_by(
+        Appointment.date
+    ).order_by(
+        Appointment.date.asc()
+    ).all()
+    daily_volumes = [{'date': str(d[0]), 'count': d[1]} for d in daily_volumes_query]
+    
     data = {
         'total_patients': total_patients,
         'total_doctors': total_doctors,
-        'total_appointments': total_appointments
+        'total_appointments': total_appointments,
+        'total_revenue': total_revenue,
+        'monthly_trends': monthly_trends,
+        'monthly_revenue': monthly_revenue,
+        'daily_volumes': daily_volumes
     }
-    cache.set(cache_key, data, timeout=300)  
+    
     return jsonify(data), 200
 
 #admin-doctor
+@app.route('/api/admin/doctors', methods=['POST'])
 @app.route('/api/admin/doctor', methods=['POST'])
 @admin_required
 def add_doctor():
@@ -246,11 +295,9 @@ def add_doctor():
     if User.query.filter_by(username=data['username']).first():
         return jsonify({'message': 'Username already taken'}), 409
 
-
     raw_password = data.get('password')
     if not raw_password:
         raw_password = ''.join(secrets.choice(string.ascii_letters + string.digits + "!@#$%^&*") for _ in range(12))
-
     
     dept_name = data['department_name']
     department = Department.query.filter_by(name=dept_name).first()
@@ -270,17 +317,18 @@ def add_doctor():
     db.session.add(new_user)
     db.session.flush() 
 
-
     availability_value = data.get('availability', 'Not specified')
     if availability_value != 'Not specified' and availability_value not in VALID_AVAILABILITY_OPTIONS:
-        return jsonify({'message': 'Invalid availability. Must be a day Monday-Saturday.'}), 400
+        return jsonify({'message': 'Invalid availability. Must be a day Monday-Sunday or Everyday.'}), 400
 
     new_doctor = Doctor(
         user_id=new_user.id,
         department_id=department.id,
         specialization=data['specialization'],
         availability=availability_value,
-        time_availability=data.get('time_availability', '10:00 AM - 09:00 PM')
+        time_availability=data.get('time_availability', '10:00 AM - 09:00 PM'),
+        consultation_fee=float(data.get('consultation_fee', 50.0)),
+        contact=data.get('contact') or data.get('phone') or ''
     )
     db.session.add(new_doctor)
     db.session.commit()
@@ -295,6 +343,7 @@ def add_doctor():
         'generated_password': raw_password
     }), 201
 
+@app.route('/api/admin/doctors/<int:doctor_id>', methods=['PUT'])
 @app.route('/api/admin/doctor/<int:doctor_id>', methods=['PUT'])
 @admin_required
 def update_doctor(doctor_id):
@@ -308,15 +357,27 @@ def update_doctor(doctor_id):
         doctor.specialization = data['specialization']
     if 'availability' in data:
         if data['availability'] not in VALID_AVAILABILITY_OPTIONS:
-            return jsonify({'message': 'Invalid availability. Must be a day Monday-Saturday.'}), 400
+            return jsonify({'message': 'Invalid availability. Must be a day Monday-Sunday or Everyday.'}), 400
         doctor.availability = data['availability']
     if 'time_availability' in data:
         doctor.time_availability = data['time_availability']
+    if 'consultation_fee' in data:
+        doctor.consultation_fee = float(data['consultation_fee'])
     if 'name' in data:
         doctor.user.username = data['name']
+    if 'username' in data:
+        doctor.user.username = data['username']
+    if 'email' in data:
+        doctor.user.email = data['email']
+    if 'contact' in data or 'phone' in data:
+        doctor.contact = data.get('contact') or data.get('phone') or ''
+    if 'status' in data:
+        if isinstance(data['status'], bool):
+            doctor.user.active = data['status']
+        else:
+            doctor.user.active = (data['status'].lower() == 'active')
     
     db.session.commit()
-    
     cache.clear() 
     print("[CACHE] Doctor profile updated.")
     
@@ -330,10 +391,14 @@ def get_all_doctors():
         'id': doc.id,
         'user_id': doc.user.id,
         'name': doc.user.username,
+        'email': doc.user.email,
+        'contact': doc.contact or '',
         'specialization': doc.specialization,
         'department': doc.department.name if doc.department else 'N/A',
         'availability': doc.availability,
-        'time_availability': doc.time_availability
+        'time_availability': doc.time_availability,
+        'consultation_fee': doc.consultation_fee,
+        'status': 'Active' if doc.user.active else 'Unavailable'
     } for doc in doctors]
     return jsonify(results), 200
 
@@ -348,11 +413,37 @@ def get_doctor(doctor_id):
         'id': doc.id,
         'name': doc.user.username,
         'email': doc.user.email,
+        'contact': doc.contact or '',
         'specialization': doc.specialization,
         'department': doc.department.name if doc.department else 'N/A',
         'availability': doc.availability,
-        'time_availability': doc.time_availability
+        'time_availability': doc.time_availability,
+        'consultation_fee': doc.consultation_fee,
+        'status': 'Active' if doc.user.active else 'Unavailable'
     }), 200
+
+@app.route('/api/admin/doctors/<int:doctor_id>', methods=['DELETE'])
+@app.route('/api/admin/doctor/<int:doctor_id>', methods=['DELETE'])
+@admin_required
+def delete_doctor(doctor_id):
+    doctor = Doctor.query.get(doctor_id)
+    if not doctor:
+        return jsonify({'message': 'Doctor not found'}), 404
+        
+    action = request.args.get('action', 'deactivate')
+    user = doctor.user
+    
+    if action == 'delete':
+        db.session.delete(doctor)
+        db.session.delete(user)
+        db.session.commit()
+        cache.clear()
+        return jsonify({'message': f'Doctor {user.username} permanently deleted.'}), 200
+    else:
+        user.active = False
+        db.session.commit()
+        cache.clear()
+        return jsonify({'message': f'Doctor {user.username} deactivated (Unavailable).'}), 200
 
 @app.route('/api/admin/doctors/search', methods=['GET'])
 @admin_required
@@ -363,53 +454,193 @@ def search_doctors():
         (User.username.ilike(f'%{query}%'))
     ).all()
     
-    results = [{'id': doc.id, 'name': doc.user.username, 'specialization': doc.specialization} for doc in doctors]
+    results = [{
+        'id': doc.id, 
+        'name': doc.user.username, 
+        'specialization': doc.specialization,
+        'email': doc.user.email,
+        'contact': doc.contact or '',
+        'status': 'Active' if doc.user.active else 'Unavailable'
+    } for doc in doctors]
     return jsonify(results), 200
-
 
 #admin-patients
 @app.route('/api/admin/patients/search', methods=['GET'])
 @admin_required
 def search_patients():
     query = request.args.get('q', '')
-    
     patients = Patient.query.join(User).filter(
         (Patient.contact.ilike(f'%{query}%')) | 
         (User.username.ilike(f'%{query}%')) |
         (User.id == int(query) if query.isdigit() else False)
     ).all()
     
-    results = [{'id': p.id, 'user_id': p.user_id, 'name': p.user.username, 'contact': p.contact, 'address': p.address} for p in patients]
+    today = datetime.now().date()
+    thirty_days_ago = today - timedelta(days=30)
+    
+    results = []
+    for p in patients:
+        has_upcoming = any(a.date >= today and a.status == 'Booked' for a in p.appointments)
+        has_recent = any(thirty_days_ago <= a.date <= today for a in p.appointments)
+        results.append({
+            'id': p.id, 
+            'user_id': p.user_id, 
+            'name': p.user.username, 
+            'email': p.user.email,
+            'contact': p.contact, 
+            'address': p.address,
+            'registration_date': p.registration_date or '2026-06-16',
+            'total_appointments': len(p.appointments),
+            'has_upcoming': has_upcoming,
+            'has_recent': has_recent
+        })
     return jsonify(results), 200
 
 @app.route('/api/admin/patients', methods=['GET'])
 @admin_required
 def get_all_patients():
     patients = Patient.query.all()
-    results = [{
+    today = datetime.now().date()
+    thirty_days_ago = today - timedelta(days=30)
+    
+    results = []
+    for p in patients:
+        has_upcoming = any(a.date >= today and a.status == 'Booked' for a in p.appointments)
+        has_recent = any(thirty_days_ago <= a.date <= today for a in p.appointments)
+        results.append({
+            'id': p.id,
+            'user_id': p.user_id,
+            'name': p.user.username,
+            'email': p.user.email,
+            'contact': p.contact,
+            'address': p.address,
+            'registration_date': p.registration_date or '2026-06-16',
+            'total_appointments': len(p.appointments),
+            'has_upcoming': has_upcoming,
+            'has_recent': has_recent
+        })
+    return jsonify(results), 200
+
+@app.route('/api/admin/patients/<int:patient_id>', methods=['GET'])
+@app.route('/api/admin/patient/<int:patient_id>', methods=['GET'])
+@admin_required
+def get_patient_detail(patient_id):
+    p = Patient.query.get(patient_id)
+    if not p:
+        return jsonify({'message': 'Patient not found'}), 404
+        
+    today = datetime.now().date()
+    history = []
+    upcoming = []
+    
+    for a in p.appointments:
+        appt_data = {
+            'id': a.id,
+            'doctor_name': a.doctor.user.username if a.doctor else 'N/A',
+            'specialization': a.doctor.specialization if a.doctor else 'N/A',
+            'date': str(a.date),
+            'time_slot': a.time_slot,
+            'status': a.status,
+            'diagnosis': a.treatment.diagnosis if a.treatment else '',
+            'prescription': a.treatment.prescription if a.treatment else '',
+            'notes': a.treatment.notes if a.treatment else ''
+        }
+        if a.date >= today and a.status != 'Cancelled':
+            upcoming.append(appt_data)
+        else:
+            history.append(appt_data)
+            
+    return jsonify({
         'id': p.id,
         'user_id': p.user_id,
         'name': p.user.username,
         'email': p.user.email,
         'contact': p.contact,
-        'address': p.address
-    } for p in patients]
-    return jsonify(results), 200
+        'address': p.address,
+        'registration_date': p.registration_date or '2026-06-16',
+        'total_appointments': len(p.appointments),
+        'history': history,
+        'upcoming': upcoming
+    }), 200
 
-@app.route('/api/admin/patient/<int:patient_id>', methods=['PUT'])
+@app.route('/api/admin/patients/<int:patient_id>/history', methods=['GET'])
 @admin_required
-def update_patient_admin(patient_id):
+def get_patient_booking_history(patient_id):
+    p = Patient.query.get(patient_id)
+    if not p:
+        return jsonify({'message': 'Patient not found'}), 404
+        
+    today = datetime.now().date()
+    history = []
+    upcoming = []
+    
+    for a in p.appointments:
+        appt_data = {
+            'id': a.id,
+            'doctor_name': a.doctor.user.username if a.doctor else 'N/A',
+            'specialization': a.doctor.specialization if a.doctor else 'N/A',
+            'date': str(a.date),
+            'time_slot': a.time_slot,
+            'status': a.status,
+            'diagnosis': a.treatment.diagnosis if a.treatment else '',
+            'prescription': a.treatment.prescription if a.treatment else '',
+            'notes': a.treatment.notes if a.treatment else ''
+        }
+        if a.date >= today and a.status != 'Cancelled':
+            upcoming.append(appt_data)
+        else:
+            history.append(appt_data)
+            
+    return jsonify({
+        'history': history,
+        'upcoming': upcoming
+    }), 200
+
+@app.route('/api/admin/patients/<int:patient_id>/export-history', methods=['GET'])
+@admin_required
+def export_patient_history_admin(patient_id):
+    from flask import make_response, render_template_string
+    from xhtml2pdf import pisa
+    import io
+    
     patient = Patient.query.get(patient_id)
     if not patient:
-         return jsonify({'message': 'Patient not found'}), 404
+        return jsonify({'message': 'Patient not found'}), 404
+        
+    appts = Appointment.query.filter_by(patient_id=patient.id).order_by(Appointment.date.desc()).all()
+    
+    html_content = render_template_string(PDF_REPORT_TEMPLATE, patient=patient, appts=appts, current_time=datetime.now().strftime('%Y-%m-%d %H:%M'))
+    
+    pdf_buffer = io.BytesIO()
+    pisa_status = pisa.CreatePDF(html_content, dest=pdf_buffer)
+    if pisa_status.err:
+        return jsonify({'message': 'PDF generation failed'}), 500
+        
+    pdf_buffer.seek(0)
+    response = make_response(pdf_buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=Medical_History_{patient.user.username}.pdf'
+    return response
+
+@app.route('/api/admin/patients/<int:patient_id>', methods=['PUT'])
+@app.route('/api/admin/patient/<int:patient_id>', methods=['PUT'])
+@admin_required
+def update_patient_details(patient_id):
+    patient = Patient.query.get(patient_id)
+    if not patient:
+        return jsonify({'message': 'Patient not found'}), 404
     data = request.get_json()
     if 'name' in data:
-         patient.user.username = data['name']
+        patient.user.username = data['name']
+    if 'email' in data:
+        patient.user.email = data['email']
     if 'contact' in data:
-         patient.contact = data['contact']
+        patient.contact = data['contact']
     if 'address' in data:
-         patient.address = data['address']
+        patient.address = data['address']
+    
     db.session.commit()
+    cache.clear()
     return jsonify({'message': 'Patient updated successfully'}), 200
 
 @app.route('/api/admin/appointments', methods=['GET'])
@@ -608,6 +839,9 @@ def add_treatment():
     cache.delete("admin_dashboard_stats")
     print("[CACHE] Patient history, doctor dashboard, and admin stats caches cleared.")
     
+    # Send Visit Completed background email
+    send_completion_email.delay(appt.id)
+    
     return jsonify({'message': 'Treatment saved!'}), 201
 
 @app.route('/api/doctor/availability', methods=['PUT'])
@@ -744,32 +978,42 @@ def book_appointment():
                  return jsonify({'message': 'Invalid time format. Please use e.g. 10:00 AM'}), 400
 
 
-    existing_appt = Appointment.query.filter_by(
-        doctor_id=doctor_id, 
-        date=appt_date, 
-        time_slot=time_slot
-    ).filter(Appointment.status != 'Cancelled').first()
+    # Locking & transaction
+    db.session.begin_nested()
+    try:
+        existing_appt = Appointment.query.filter_by(
+            doctor_id=doctor_id, 
+            date=appt_date, 
+            time_slot=time_slot
+        ).filter(~Appointment.status.in_(['Cancelled', 'Completed'])).with_for_update().first()
 
-    if existing_appt:
-        return jsonify({'message': 'Time slot already taken'}), 400
+        if existing_appt:
+            db.session.rollback()
+            return jsonify({'message': 'Slot unavailable'}), 400
 
-    new_appt = Appointment(
-        doctor_id=doctor_id,
-        patient_id=patient.id,
-        date=appt_date,
-        time_slot=time_slot,
-        status='Booked'
-    )
-    db.session.add(new_appt)
-    db.session.commit()
-    
-
-    cache.delete(f"doctor_{doctor_id}_availability")
-    cache.delete(f"patient_history_{patient.id}")
-    cache.delete("admin_dashboard_stats")
-    print(f"\n[CACHE] Cleared availability and history cache for Patient {patient.id} and Doctor {doctor_id} after new booking.\n")
-    
-    return jsonify({'message': 'Appointment successfully booked!'}), 201
+        new_appt = Appointment(
+            doctor_id=doctor_id,
+            patient_id=patient.id,
+            date=appt_date,
+            time_slot=time_slot,
+            status='Booked'
+        )
+        db.session.add(new_appt)
+        db.session.commit()
+        
+        # Clear caches
+        cache.delete(f"doctor_{doctor_id}_availability")
+        cache.delete(f"patient_history_{patient.id}")
+        cache.delete("admin_dashboard_stats")
+        print(f"\n[CACHE] Cleared availability and history cache for Patient {patient.id} and Doctor {doctor_id} after new booking.\n")
+        
+        # Async send booking email
+        send_booking_email.delay(new_appt.id)
+        
+        return jsonify({'message': 'Appointment successfully booked!'}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': 'Slot unavailable'}), 400
 
 @app.route('/api/patient/appointment/<int:appointment_id>', methods=['PATCH'])
 @patient_required
@@ -818,8 +1062,8 @@ def manage_patient_appointment(appointment_id):
             Appointment.date == parsed_date,
             Appointment.time_slot == new_time_slot,
             Appointment.id != appt.id,
-            Appointment.status != 'Cancelled'
-        ).first()
+            ~Appointment.status.in_(['Cancelled', 'Completed'])
+        ).with_for_update().first()
 
         if conflict:
             return jsonify({'message': 'Time slot already taken'}), 400
@@ -935,41 +1179,38 @@ def cross_role_patient_history(patient_id):
 @app.route('/api/patient/export-history', methods=['POST'])
 @patient_required
 def trigger_export():
-    from flask import send_file
+    from flask import make_response, render_template_string
+    from xhtml2pdf import pisa
     import io
-    import csv
     
     user_id = get_jwt_identity()
     patient = Patient.query.filter_by(user_id=user_id).first()
     
     appts = Appointment.query.filter_by(patient_id=patient.id).order_by(Appointment.date.desc()).all()
     
-    #download medical history 
-    si = io.StringIO()
-    writer = csv.writer(si)
-    writer.writerow(['Patient ID', 'Patient Name', 'Doctor', 'Appointment Date', 'Time Slot', 'Specialization', 'Diagnosis', 'Prescription', 'Next Visit/Notes', 'Status'])
+    html_content = render_template_string(PDF_REPORT_TEMPLATE, patient=patient, appts=appts, current_time=datetime.now().strftime('%Y-%m-%d %H:%M'))
     
-    for appt in appts:
-        diag = appt.treatment.diagnosis if appt.treatment else ""
-        presc = appt.treatment.prescription if appt.treatment else ""
-        notes = appt.treatment.notes if appt.treatment else ""
+    pdf_buffer = io.BytesIO()
+    pisa_status = pisa.CreatePDF(html_content, dest=pdf_buffer)
+    if pisa_status.err:
+        return jsonify({'message': 'PDF generation failed'}), 500
         
-        writer.writerow([
-            patient.user_id, patient.user.username, appt.doctor.user.username, 
-            str(appt.date), appt.time_slot, appt.doctor.specialization, 
-            diag, presc, notes, appt.status
-        ])
+    pdf_buffer.seek(0)
+    response = make_response(pdf_buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=Medical_History_{patient.user.username}.pdf'
+    return response
+
+@app.route('/api/patient/export-csv', methods=['POST'])
+@patient_required
+def trigger_csv_export():
+    user_id = get_jwt_identity()
+    patient = Patient.query.filter_by(user_id=user_id).first()
+    if not patient:
+        return jsonify({'message': 'Patient not found'}), 404
         
-    output = io.BytesIO()
-    output.write(si.getvalue().encode('utf-8'))
-    output.seek(0)
-    
-    return send_file(
-        output,
-        mimetype='text/csv',
-        download_name=f'Medical_History_{patient.user.username}.csv',
-        as_attachment=True
-    )
+    export_treatment_csv.delay(patient.id)
+    return jsonify({'message': 'Batch export job triggered successfully! You will receive an email notification with your records shortly.'}), 202
 
 @app.route('/api/appointments/<int:appointment_id>/status', methods=['PATCH'])
 @jwt_required()
@@ -1012,6 +1253,9 @@ def update_shared_appointment_status(appointment_id):
     cache.delete(f"doctor_dashboard_{appt.doctor_id}")
     cache.delete("admin_dashboard_stats")
     
+    if new_status == 'Completed':
+        send_completion_email.delay(appt.id)
+        
     return jsonify({'message': f'Appointment updated to {new_status}'}), 200
 
 
@@ -1113,6 +1357,361 @@ def export_treatment_csv(patient_id):
         print(f"\n[ALERT - JOB COMPLETE] CSV Export generated locally at {filename}, but email failed: {str(e)}\n")
         
     return filename
+
+
+@celery.task(name='app.send_booking_email')
+def send_booking_email(appointment_id):
+    from flask_mail import Message
+    with app.app_context():
+        appt = Appointment.query.get(appointment_id)
+        if not appt:
+            return "Appointment not found"
+        msg = Message(
+            subject="Appointment Confirmed - CareSync HMS",
+            recipients=[appt.patient.user.email],
+            body=f"Dear {appt.patient.user.username},\n\nYour appointment with Dr. {appt.doctor.user.username} has been successfully booked for {appt.date} at {appt.time_slot}.\n\nThank you for choosing CareSync HMS.\n\nBest regards,\nCareSync HMS Team"
+        )
+        mail.send(msg)
+        return f"Booking email sent to {appt.patient.user.email}"
+
+@celery.task(name='app.send_completion_email')
+def send_completion_email(appointment_id):
+    from flask_mail import Message
+    with app.app_context():
+        appt = Appointment.query.get(appointment_id)
+        if not appt:
+            return "Appointment not found"
+        msg = Message(
+            subject="Appointment Completed - CareSync HMS",
+            recipients=[appt.patient.user.email],
+            body=f"Dear {appt.patient.user.username},\n\nYour appointment with Dr. {appt.doctor.user.username} on {appt.date} at {appt.time_slot} has been marked as Completed.\n\nYou can log into your portal to view your medical records, diagnosis, and prescriptions.\n\nBest regards,\nCareSync HMS Team"
+        )
+        mail.send(msg)
+        return f"Completion email sent to {appt.patient.user.email}"
+
+
+# ----------------------------------------------------
+# PAYMENT GATEWAY INTEGRATION ENDPOINTS
+# ----------------------------------------------------
+
+@app.route('/api/payments/create-order', methods=['POST'])
+@patient_required
+def create_payment_order():
+    # Clean up expired payments first
+    ten_minutes_ago = datetime.now() - timedelta(minutes=10)
+    expired_payments = Payment.query.filter(
+        Payment.status == 'Pending',
+        Payment.created_at < ten_minutes_ago
+    ).all()
+    for p in expired_payments:
+        if p.appointment and p.appointment.status == 'Pending Payment':
+            db.session.delete(p.appointment)
+        db.session.delete(p)
+    db.session.commit()
+
+    data = request.get_json()
+    user_id = get_jwt_identity()
+    patient = Patient.query.filter_by(user_id=user_id).first()
+    
+    doctor_id = data.get('doctor_id')
+    appt_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+    time_slot = data['time_slot']
+
+    doctor = Doctor.query.get(doctor_id)
+    if not doctor:
+        return jsonify({'message': 'Doctor not found'}), 404
+
+    # Check Doctor availability
+    if doctor.availability and doctor.availability not in ['Not specified', 'Everyday']:
+        if appt_date.strftime('%A') != doctor.availability:
+            return jsonify({'message': f'Doctor is only available on {doctor.availability}s'}), 400
+    
+    if doctor.time_availability and ' - ' in doctor.time_availability:
+        start_str, end_str = doctor.time_availability.split(' - ')
+        start_time = parse_time_logic(start_str)
+        end_time = parse_time_logic(end_str)
+        req_time = parse_time_logic(time_slot)
+        
+        if start_time and end_time and req_time:
+            if not (start_time <= req_time <= end_time):
+                return jsonify({'message': f'Doctor is only available between {start_str} and {end_str}'}), 400
+        elif not req_time:
+             return jsonify({'message': 'Invalid time format. Please use e.g. 10:00 AM'}), 400
+
+    # Locking & transaction
+    db.session.begin_nested()
+    try:
+        # Check if slot already taken
+        conflict = Appointment.query.filter_by(
+            doctor_id=doctor_id, 
+            date=appt_date, 
+            time_slot=time_slot
+        ).filter(~Appointment.status.in_(['Cancelled', 'Completed'])).with_for_update().first()
+
+        if conflict:
+            db.session.rollback()
+            return jsonify({'message': 'Slot unavailable'}), 400
+
+        # Create temporary appointment
+        new_appt = Appointment(
+            doctor_id=doctor_id,
+            patient_id=patient.id,
+            date=appt_date,
+            time_slot=time_slot,
+            status='Pending Payment'
+        )
+        db.session.add(new_appt)
+        db.session.flush()
+
+        # Create Payment Record
+        order_id = str(uuid.uuid4())
+        new_payment = Payment(
+            appointment_id=new_appt.id,
+            amount=doctor.consultation_fee,
+            status='Pending',
+            transaction_id=order_id
+        )
+        db.session.add(new_payment)
+        db.session.commit()
+
+        return jsonify({
+            'order_id': order_id,
+            'amount': doctor.consultation_fee,
+            'appointment_id': new_appt.id,
+            'doctor_name': doctor.user.username,
+            'specialization': doctor.specialization
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'Transaction error: {str(e)}'}), 500
+
+
+@app.route('/api/payments/verify', methods=['POST'])
+@patient_required
+def verify_payment():
+    data = request.get_json()
+    appointment_id = data.get('appointment_id')
+    order_id = data.get('order_id')
+    transaction_id = data.get('transaction_id')
+    cardholder = data.get('cardholder_name')
+
+    # Locking the appointment row for update
+    db.session.begin_nested()
+    try:
+        appt = Appointment.query.filter_by(id=appointment_id, status='Pending Payment').with_for_update().first()
+        if not appt:
+            db.session.rollback()
+            return jsonify({'message': 'Appointment booking session expired or not found.'}), 400
+
+        payment = Payment.query.filter_by(appointment_id=appointment_id, status='Pending').with_for_update().first()
+        if not payment:
+            db.session.rollback()
+            return jsonify({'message': 'Payment details not found.'}), 400
+
+        # Process payment (mock verification)
+        payment.status = 'Completed'
+        payment.transaction_id = transaction_id or f"TXN-{secrets.token_hex(8).upper()}"
+        appt.status = 'Booked'
+        db.session.commit()
+
+        # Clear Caches
+        cache.delete(f"doctor_{appt.doctor_id}_availability")
+        cache.delete(f"patient_history_{appt.patient_id}")
+        cache.delete("admin_dashboard_stats")
+
+        # Async send booking confirmation email
+        send_booking_email.delay(appt.id)
+
+        return jsonify({'message': 'Payment successful and appointment confirmed!'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'Verification failed: {str(e)}'}), 500
+
+
+PDF_REPORT_TEMPLATE = """<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page {
+            size: letter;
+            margin: 1.5cm;
+        }
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            color: #2c3e50;
+            font-size: 10pt;
+            line-height: 1.4;
+        }
+        .header {
+            border-bottom: 2px solid #5ba2c8;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            color: #5ba2c8;
+            margin: 0;
+            font-size: 24pt;
+            font-weight: bold;
+        }
+        .header p {
+            margin: 2px 0 0 0;
+            color: #7f8c8d;
+            font-size: 10pt;
+        }
+        .section-title {
+            color: #2c3e50;
+            font-size: 14pt;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 5px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .patient-info {
+            margin-bottom: 25px;
+            background-color: #f8fafc;
+            padding: 12px;
+            border-radius: 6px;
+        }
+        .patient-info td {
+            padding: 4px 10px;
+        }
+        .patient-info .label {
+            font-weight: bold;
+            color: #7f8c8d;
+            width: 120px;
+        }
+        .record-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .record-table th {
+            background-color: #5ba2c8;
+            color: white;
+            font-weight: bold;
+            text-align: left;
+            padding: 8px;
+            font-size: 9pt;
+        }
+        .record-table td {
+            padding: 8px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 9pt;
+            vertical-align: top;
+        }
+        .treatment-details {
+            background-color: #f1f5f9;
+            padding: 6px;
+            margin-top: 4px;
+            border-left: 3px solid #5ba2c8;
+            font-size: 8.5pt;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 8pt;
+            font-weight: bold;
+        }
+        .badge-completed {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .badge-booked {
+            background-color: #eff6ff;
+            color: #1e40af;
+        }
+        .footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 8pt;
+            color: #94a3b8;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>CareSync HMS</h1>
+        <p>Official Patient Medical History Report</p>
+    </div>
+    
+    <div class="section-title">Patient Profile</div>
+    <table class="patient-info" style="width: 100%;">
+        <tr>
+            <td class="label">Patient Name:</td>
+            <td><strong>{{ patient.user.username }}</strong></td>
+            <td class="label">Patient ID:</td>
+            <td>#{{ patient.id }}</td>
+        </tr>
+        <tr>
+            <td class="label">Email Address:</td>
+            <td>{{ patient.user.email }}</td>
+            <td class="label">Contact:</td>
+            <td>{{ patient.contact or 'N/A' }}</td>
+        </tr>
+        <tr>
+            <td class="label">Address:</td>
+            <td colspan="3">{{ patient.address or 'N/A' }}</td>
+        </tr>
+    </table>
+    
+    <div class="section-title">Clinical Visits Records</div>
+    <table class="record-table">
+        <thead>
+            <tr>
+                <th style="width: 20%;">Date / Slot</th>
+                <th style="width: 25%;">Doctor / Department</th>
+                <th style="width: 45%;">Diagnosis & Prescription</th>
+                <th style="width: 10%;">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for appt in appts %}
+            <tr>
+                <td>
+                    <strong>{{ appt.date }}</strong><br>
+                    <span style="color: #64748b; font-size: 8pt;">{{ appt.time_slot }}</span>
+                </td>
+                <td>
+                    <strong>Dr. {{ appt.doctor.user.username }}</strong><br>
+                    <span style="color: #64748b; font-size: 8pt;">{{ appt.doctor.specialization }} Department</span>
+                </td>
+                <td>
+                    {% if appt.treatment %}
+                    <div class="treatment-details">
+                        <strong>Diagnosis:</strong> {{ appt.treatment.diagnosis }}<br>
+                        <strong>Prescription:</strong> {{ appt.treatment.prescription }}
+                        {% if appt.treatment.notes %}
+                        <br><strong>Notes:</strong> {{ appt.treatment.notes }}
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <span style="color: #94a3b8; font-style: italic;">No clinical record populated.</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="badge {% if appt.status == 'Completed' %}badge-completed{% else %}badge-booked{% endif %}">
+                        {{ appt.status }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="footer">
+        Report Generated on {{ current_time }} • CareSync Health Systems
+    </div>
+</body>
+</html>
+"""
 
 
 celery_app = celery 

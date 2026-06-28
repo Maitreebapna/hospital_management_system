@@ -63,112 +63,75 @@
                 </div>
 
                 <div class="row g-4">
-                    <!-- Appointments List -->
+                    <!-- Upcoming Weekly Schedule Timeline -->
                     <div class="col-12">
                         <div class="card shadow-sm border-0">
                             <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
                                 <i class="bi bi-calendar-check text-primary fs-5"></i>
-                                <h5 class="mb-0 fw-bold text-dark">Upcoming Appointments</h5>
+                                <h5 class="mb-0 fw-bold text-dark">Upcoming Weekly Schedule</h5>
                             </div>
-                            <div class="card-body p-0 bg-white">
-                                <div class="table-responsive border-0">
-                                    <table class="table table-hover table-striped mb-0">
-                                        <thead>
-                                            <tr>
-                                                <th style="width: 80px;">AID</th>
-                                                <th>Patient Name</th>
-                                                <th>Appointment Date</th>
-                                                <th>Time Slot</th>
-                                                <th>Status</th>
-                                                <th class="text-end">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr v-for="appt in appointments" :key="appt.id" class="align-middle">
-                                                <td class="fw-bold text-muted">#{{ appt.id }}</td>
-                                                <td>
+                            <div class="card-body p-4 bg-white">
+                                <!-- Timeline Layout -->
+                                <div class="timeline-container" v-if="appointments.length > 0">
+                                    <div class="timeline-item position-relative ps-5 pb-4" v-for="appt in appointments" :key="appt.id">
+                                        <!-- Timeline node clock icon -->
+                                        <div class="timeline-badge bg-primary text-white position-absolute rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="left: 12px; top: 0; width: 34px; height: 34px; z-index: 2;">
+                                            <i class="bi bi-clock-fill fs-6"></i>
+                                        </div>
+                                        
+                                        <!-- Card style layout for timeline item -->
+                                        <div class="card border-0 shadow-sm bg-light-subtle rounded-3 p-3 timeline-card">
+                                            <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                                                <div>
+                                                    <!-- Time Slot & Date -->
+                                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                                        <span class="badge bg-primary rounded-pill px-3 py-1.5 fw-bold fs-6">
+                                                            {{ appt.time_slot }}
+                                                        </span>
+                                                        <span class="text-muted fw-semibold small">
+                                                            <i class="bi bi-calendar3 me-1"></i>{{ appt.date }}
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    <!-- Patient Info -->
                                                     <div class="d-flex align-items-center gap-2">
-                                                        <div class="bg-light text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;">
+                                                        <div class="bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
                                                             <i class="bi bi-person-fill"></i>
                                                         </div>
-                                                        <strong class="text-dark">{{ appt.patient_name }}</strong>
+                                                        <div>
+                                                            <h6 class="mb-0 fw-extrabold text-dark">{{ appt.patient_name }}</h6>
+                                                            <span class="text-muted small">Appointment ID: #{{ appt.id }}</span>
+                                                        </div>
                                                     </div>
-                                                </td>
-                                                <td>
-                                                    <i class="bi bi-calendar3 text-muted small me-1"></i>
-                                                    <span>{{ appt.date }}</span>
-                                                </td>
-                                                <td>
-                                                    <span class="badge bg-secondary rounded-pill px-3 py-2">{{ appt.time_slot }}</span>
-                                                </td>
-                                                <td>
-                                                    <span class="badge rounded-pill px-3 py-2" :class="{'bg-success-subtle text-success border border-success-subtle': appt.status === 'Completed', 'bg-warning-subtle text-warning-emphasis border border-warning-subtle': appt.status === 'Cancelled', 'bg-primary-subtle text-primary border border-primary-subtle': appt.status === 'Booked'}">
+                                                </div>
+                                                
+                                                <!-- Status & Actions -->
+                                                <div class="d-flex align-items-center gap-3">
+                                                    <span class="badge rounded-pill px-3 py-2 text-uppercase fw-bold" :class="{'bg-success-subtle text-success border border-success-subtle': appt.status === 'Completed', 'bg-warning-subtle text-warning-emphasis border border-warning-subtle': appt.status === 'Cancelled', 'bg-primary-subtle text-primary border border-primary-subtle': appt.status === 'Booked'}">
                                                         {{ appt.status }}
                                                     </span>
-                                                </td>
-                                                <td class="text-end">
-                                                    <div class="d-flex justify-content-end gap-2" v-if="appt.status === 'Booked'">
-                                                        <button class="btn btn-sm btn-primary px-3 py-1 shadow-sm fw-bold" @click="openTreatmentForm(appt)">
-                                                            <i class="bi bi-journal-medical me-1"></i>Prescribe
+                                                    
+                                                    <div v-if="appt.status === 'Booked'" class="d-flex gap-2">
+                                                        <button class="btn btn-sm btn-primary px-3 py-2 fw-bold shadow-sm rounded-pill" @click="openTreatmentModal(appt)">
+                                                            <i class="bi bi-journal-medical me-1"></i>Add Treatment
                                                         </button>
-                                                        <button class="btn-action-circle danger" @click="cancelAppt(appt.id)" title="Cancel Appointment">
-                                                            <i class="bi bi-x-lg"></i>
+                                                        <button class="btn btn-sm btn-outline-danger px-3 py-2 fw-bold rounded-pill" @click="cancelAppt(appt.id)" title="Cancel Appointment">
+                                                            <i class="bi bi-x-circle me-1"></i>Cancel
                                                         </button>
                                                     </div>
-                                                    <span v-else class="text-muted small italic px-3">Handled</span>
-                                                </td>
-                                            </tr>
-                                            <tr v-if="appointments.length === 0">
-                                                <td colspan="6" class="text-center text-muted py-5">
-                                                    <i class="bi bi-calendar-x fs-2 d-block mb-2"></i>
-                                                    No upcoming appointments found.
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                                                    <span v-else class="text-muted small italic">Handled</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="text-center text-muted py-5" v-else>
+                                    <i class="bi bi-calendar-x fs-2 d-block mb-2"></i>
+                                    No upcoming appointments found.
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Prescribing Treatment Panel Overlay -->
-                    <div class="col-12" v-if="activeApptId">
-                        <transition name="slide-up">
-                            <div class="card border-0 shadow-lg prescription-card">
-                                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
-                                    <h5 class="mb-0 fw-bold"><i class="bi bi-file-earmark-medical me-2"></i>Treatment Record: {{ activePatientName }}</h5>
-                                    <button type="button" class="btn-close btn-close-white" @click="activeApptId = null"></button>
-                                </div>
-                                <div class="card-body p-4 bg-white">
-                                    <form @submit.prevent="saveTreatment" class="d-flex flex-column gap-3">
-                                        <div>
-                                            <label class="form-label text-secondary small fw-bold">Medical Diagnosis</label>
-                                            <div class="input-icon-wrapper">
-                                                <i class="bi bi-activity input-icon"></i>
-                                                <input type="text" class="form-control" v-model="treatment.diagnosis" placeholder="e.g. Hypertension, Viral Fever" required>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label class="form-label text-secondary small fw-bold">Prescribed Medication</label>
-                                            <div class="input-icon-wrapper">
-                                                <i class="bi bi-capsule-pill input-icon"></i>
-                                                <input type="text" class="form-control" v-model="treatment.prescription" placeholder="e.g. Amoxicillin 500mg, Paracetamol 650mg" required>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label class="form-label text-secondary small fw-bold">Clinical Notes</label>
-                                            <textarea class="form-control" v-model="treatment.notes" rows="3" placeholder="e.g. Take twice daily after meals. Rest for 3 days."></textarea>
-                                        </div>
-                                        <div class="d-flex gap-2 justify-content-end mt-2">
-                                            <button type="button" class="btn btn-secondary px-4" @click="activeApptId = null">Cancel</button>
-                                            <button type="submit" class="btn btn-success px-4 fw-bold">
-                                                <i class="bi bi-file-earmark-check me-2"></i>Save & Complete Visit
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </transition>
                     </div>
                 </div>
             </div>
@@ -178,7 +141,7 @@
             ------------------------------------------ -->
             <div v-show="currentTab === 'schedule'" class="fade-in-up">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h3 class="mb-0 fw-bold font-heading text-primary">Manage Schedule & Working Hours</h3>
+                    <h3 class="mb-0 fw-bold font-heading text-primary">Manage Schedule</h3>
                 </div>
 
                 <div class="row g-4">
@@ -239,7 +202,6 @@
                                     <div>
                                         <label class="form-label text-secondary small fw-bold">Working Hours Range</label>
                                         <div class="input-icon-wrapper">
-                                            <i class="bi bi-clock input-icon"></i>
                                             <input type="text" class="form-control" v-model="time_availability" placeholder="e.g. 10:00 AM - 05:00 PM" required>
                                         </div>
                                     </div>
@@ -258,7 +220,7 @@
             ------------------------------------------ -->
             <div v-show="currentTab === 'patients'" class="fade-in-up">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h3 class="mb-0 fw-bold font-heading text-primary">Assigned Patients & History Lookup</h3>
+                    <h3 class="mb-0 fw-bold font-heading text-primary">Assigned Patients & History</h3>
                 </div>
 
                 <div class="row g-4">
@@ -267,7 +229,7 @@
                         <div class="card shadow-sm border-0">
                             <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
                                 <i class="bi bi-people-fill text-primary fs-5"></i>
-                                <h5 class="mb-0 fw-bold text-dark">Patient Registry</h5>
+                                <h5 class="mb-0 fw-bold text-dark">Registered Patients</h5>
                             </div>
                             <div class="card-body p-3 bg-white">
                                 <div class="patients-list-scroll pe-1" style="max-height: 500px; overflow-y: auto;" v-if="patients.length > 0">
@@ -301,7 +263,7 @@
                                 <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
                                     <div class="d-flex align-items-center gap-2">
                                         <i class="bi bi-clock-history text-primary fs-5"></i>
-                                        <h5 class="mb-0 fw-bold text-dark">Timeline: {{ selectedPatient.name }}</h5>
+                                        <h5 class="mb-0 fw-bold text-dark">Prescription: {{ selectedPatient.name }}</h5>
                                     </div>
                                     <button type="button" class="btn-close" @click="selectedPatient = null"></button>
                                 </div>
@@ -353,6 +315,42 @@
         <button class="theme-customizer-trigger" @click="toggleDarkMode" :title="isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
             <i class="bi" :class="isDarkMode ? 'bi-sun-fill text-warning' : 'bi-moon-fill text-white'"></i>
         </button>
+
+        <!-- Bootstrap 5 Styled Treatment Modal -->
+        <div class="modal fade show d-block" style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 1060;" v-if="showTreatmentModal">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden animate-zoom">
+                    <div class="modal-header bg-teal text-white border-0 py-3">
+                        <h5 class="modal-title fw-bold mb-0"><i class="bi bi-file-earmark-medical me-2"></i>Add Treatment: {{ activePatientName }}</h5>
+                        <button type="button" class="btn-close btn-close-white" @click="closeTreatmentModal"></button>
+                    </div>
+                    <form @submit.prevent="saveTreatment">
+                        <div class="modal-body p-4 bg-white">
+                            <div class="d-flex flex-column gap-3">
+                                <div>
+                                    <label class="form-label text-secondary small fw-bold">Medical Diagnosis</label>
+                                    <input type="text" class="form-control" v-model="treatment.diagnosis" required>
+                                </div>
+                                <div>
+                                    <label class="form-label text-secondary small fw-bold">Prescribed Medication</label>
+                                    <input type="text" class="form-control" v-model="treatment.prescription" required>
+                                </div>
+                                <div>
+                                    <label class="form-label text-secondary small fw-bold">Clinical Notes</label>
+                                    <textarea class="form-control" v-model="treatment.notes" rows="3"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light border-0 py-3">
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" @click="closeTreatmentModal">Cancel</button>
+                            <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold">
+                                <i class="bi bi-file-earmark-check me-2"></i>Save & Complete
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -367,7 +365,8 @@ export default {
             treatment: { diagnosis: '', prescription: '', notes: '' },
             patients: [], selectedPatient: null, patientHistory: [],
             currentTab: 'appointments',
-            isDarkMode: false
+            isDarkMode: false,
+            showTreatmentModal: false
         }
     },
     methods: {
@@ -405,10 +404,16 @@ export default {
             });
             if (res.ok) { this.showMsg('success', "Your schedule is now updated."); }
         },
-        openTreatmentForm(appt) {
+        openTreatmentModal(appt) {
             this.activeApptId = appt.id;
             this.activePatientName = appt.patient_name;
+            this.treatment = { diagnosis: '', prescription: '', notes: '' };
+            this.showTreatmentModal = true;
             this.success = '';
+        },
+        closeTreatmentModal() {
+            this.showTreatmentModal = false;
+            this.activeApptId = null;
         },
         async saveTreatment() {
             const payload = { appointment_id: this.activeApptId, ...this.treatment };
@@ -419,6 +424,7 @@ export default {
                 this.showMsg('success', "Medical record saved.");
                 this.activeApptId = null;
                 this.treatment = { diagnosis: '', prescription: '', notes: '' };
+                this.showTreatmentModal = false;
                 this.fetchData();
                 if (this.selectedPatient) this.viewPatientHistory(this.selectedPatient);
             } else {
@@ -455,8 +461,7 @@ export default {
                 prescription: h.treatment ? h.treatment.prescription : '',
                 notes: h.treatment ? h.treatment.notes : ''
             };
-            this.currentTab = 'appointments'; // Switch to appointments tab to display prescription card
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            this.showTreatmentModal = true;
         },
         loadTheme() {
             const darkMode = localStorage.getItem('theme-dark') === 'true';
@@ -523,9 +528,7 @@ export default {
     font-size: 16px;
 }
 
-.input-icon-wrapper .form-control {
-    padding-left: 42px;
-}
+/* Padding left removed for plain inputs */
 
 .treatment-box {
     border-left: 4px solid #0d9488 !important;
@@ -542,9 +545,52 @@ export default {
     border-radius: 10px;
 }
 
+/* Vertical Schedule Timeline */
+.timeline-container {
+    position: relative;
+}
+
+.timeline-container::before {
+    content: '';
+    position: absolute;
+    top: 15px;
+    bottom: 15px;
+    left: 28px;
+    width: 2px;
+    background-color: #e2e8f0;
+    z-index: 1;
+}
+
+.timeline-item:last-child {
+    padding-bottom: 0 !important;
+}
+
+.timeline-card {
+    transition: all 0.3s ease;
+    border-left: 4px solid #0d9488 !important;
+}
+
+.timeline-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
+.bg-teal {
+    background-color: #0d9488 !important;
+}
+
 /* Animations */
 .slide-up-enter-active, .slide-up-leave-active { transition: all 0.3s ease; }
 .slide-up-enter-from, .slide-up-leave-to { opacity: 0; transform: translateY(10px); }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+@keyframes zoomIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.animate-zoom {
+    animation: zoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
 </style>
