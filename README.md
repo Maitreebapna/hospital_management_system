@@ -1,4 +1,4 @@
-# Hospital Management System (HMS) v2
+# Hospital Management System (HMS) 
 
 A dynamic, full-stack Hospital Management platform designed to streamline medical administration. This system features three distinct Role-Based Access portals: an **Admin Dashboard** for creating doctors and analyzing hospital statistics, a **Doctor Dashboard** for managing appointments and charting patient treatments, and a **Patient Dashboard** for booking schedules and downloading CSV medical histories.
 
