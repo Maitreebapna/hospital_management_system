@@ -2,12 +2,12 @@
 
 A dynamic, full-stack Hospital Management platform designed to streamline medical administration. This system features three distinct Role-Based Access portals: an **Admin Dashboard** for creating doctors and analyzing hospital statistics, a **Doctor Dashboard** for managing appointments and charting patient treatments, and a **Patient Dashboard** for booking schedules and downloading CSV medical histories.
 
-## 🚀 Technical Stack
+##  Technical Stack
 - **Backend:** Python, Flask (RESTful API), SQLite (Primary DB), Redis (Caching & Job Broker)
 - **Frontend:** Vue3, Bootstrap 5
 - **Async Execution:** Celery (Worker & Beat)
 
-## 🛠️ Project Setup
+##  Project Setup
 
 ### 1. Requirements
 Ensure you have **Redis** installed and running on your system (Default port `6379`).
@@ -34,7 +34,7 @@ python init_db.py
 - Email: `admin@hms.com`
 - Password: `admin123`
 
-## 🏃 Running the Application
+##  Running the Application
 To run the full system, you need to open **four terminal windows**:
 
 1. **Redis Server**: Start your local Redis instance.
