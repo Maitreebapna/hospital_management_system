@@ -4,7 +4,7 @@ A dynamic, full-stack Hospital Management platform designed to streamline medica
 
 ## 🚀 Technical Stack
 - **Backend:** Python, Flask (RESTful API), SQLite (Primary DB), Redis (Caching & Job Broker)
-- **Frontend:** Vue 3 (SFC Loader), Bootstrap 5, Vanilla CSS
+- **Frontend:** Vue3, Bootstrap 5
 - **Async Execution:** Celery (Worker & Beat)
 
 ## 🛠️ Project Setup
@@ -58,6 +58,3 @@ To run the full system, you need to open **four terminal windows**:
 - `backend/`: Flask application, models, and background tasks.
 - `frontend/`: Vue.js components and HTML entry points.
 - `static_url_path`: Configured to serve `frontend/` from the root.
-
----
-Built with modern web standards and Agentic AI assistance.
