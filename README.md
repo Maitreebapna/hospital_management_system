@@ -54,7 +54,7 @@ To run the full system, you need to open **four terminal windows**:
    celery -A app.celery_app beat --loglevel=info
    ```
 
-## 📂 Project Structure
+## Project Structure
 - `backend/`: Flask application, models, and background tasks.
 - `frontend/`: Vue.js components and HTML entry points.
 - `static_url_path`: Configured to serve `frontend/` from the root.
