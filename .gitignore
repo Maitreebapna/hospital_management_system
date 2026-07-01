@@ -1,0 +1,29 @@
+# Python and Flask
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment and Virtual Environments
+.env
+venv.bak/
+myenv/
+.venv/
+env/
+
+# SQLite Database
+*.db
+*.sqlite3
+instance/
+
+# Flask Caching and Celery
+celerybeat-schedule*
+*.pid
+exports/
+
+# IDEs
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
