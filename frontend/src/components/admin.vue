@@ -1,5 +1,5 @@
 <template>
-    <div class="dashboard-container fade-in-up"> </div>
+    <div class="dashboard-container fade-in-up">
         <!-- Modern Left Sidebar Navigation -->
         <div class="dashboard-sidebar text-white">
             <div>
@@ -693,7 +693,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- Secondary Graphs Row (Moved from Overview) -->
                 <div class="row g-4 mt-4">
                     <!-- Monthly Booking & Revenue Trends -->
@@ -1040,6 +1039,7 @@
                 </form>
             </div>
         </div>
+    </div>
 </template>
 
 <script>
@@ -1209,7 +1209,6 @@ export default {
                     });
                 }
             }
-
             // Render Monthly Trends Chart
             const ctxTrends = document.getElementById('trendsChart');
             if (ctxTrends) {

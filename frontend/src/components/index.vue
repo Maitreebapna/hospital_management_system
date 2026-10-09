@@ -11,12 +11,6 @@
 
             <!-- Login/Register Main Card -->
             <div class="card shadow-lg border-0 rounded-4 overflow-hidden fade-in-up">
-                <!-- Visual Banner at Top of Card -->
-                <div class="card-banner-img-wrapper position-relative">
-                    <img src="/hospital_banner.png" alt="Hospital Care Center" class="img-fluid w-100 card-banner-img">
-                    <div class="banner-gradient-overlay"></div>
-                </div>
-
                 <!-- Nav Tabs -->
                 <div class="card-header bg-white p-0 border-bottom">
                     <div class="d-flex text-center">
@@ -192,26 +186,6 @@ export default {
     border-radius: 12px;
     display: grid;
     place-items: center;
-}
-
-.card-banner-img-wrapper {
-    height: 180px;
-    overflow: hidden;
-}
-
-.card-banner-img {
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
-}
-
-.banner-gradient-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(to bottom, rgba(30, 41, 59, 0.1), rgba(255, 255, 255, 1));
 }
 
 .tab-button {
