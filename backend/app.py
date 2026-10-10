@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 import secrets
 import string
+from dotenv import load_dotenv
 from celery import Celery
 from celery.schedules import crontab
 
@@ -34,32 +35,49 @@ from models import (
     Payment
 )
 
+load_dotenv()
+
 app = Flask(__name__, template_folder='../frontend', static_folder='../frontend', static_url_path='')
 
-# 1. CONFIGURATION & SETUP
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///hms.db'
+database_url = os.getenv('DATABASE_URL') or 'sqlite:///hms.db'
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+secret_key = os.getenv('SECRET_KEY')
+jwt_secret = os.getenv('JWT_SECRET')
+security_password_salt = os.getenv('SECURITY_PASSWORD_SALT')
+if not secret_key or not jwt_secret or not security_password_salt:
+    raise RuntimeError(
+        'Set SECRET_KEY, JWT_SECRET, and SECURITY_PASSWORD_SALT environment variables.'
+    )
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = 'your-super-secret-jwt-key'  
+app.config['SECRET_KEY'] = secret_key
+app.config['SECURITY_PASSWORD_SALT'] = security_password_salt
+app.config['JWT_SECRET_KEY'] = jwt_secret
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24) 
 
-# Email configuration 
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'your-email@gmail.com'  
-app.config['MAIL_PASSWORD'] = 'your-app-password'  
-app.config['MAIL_DEFAULT_SENDER'] = 'your-email@gmail.com'
+app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', '587'))
+app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'true').lower() == 'true'
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', '')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', '')
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', '')
 
 db.init_app(app)
-CORS(app)
+frontend_url = (os.getenv('FRONTEND_URL') or '').rstrip('/')
+if frontend_url:
+    CORS(app, resources={r'/api/*': {'origins': frontend_url}})
 jwt = JWTManager(app)
 from flask_mail import Mail
 mail = Mail(app)
 
 
 from flask_caching import Cache
-app.config['CACHE_TYPE'] = 'RedisCache'
-app.config['CACHE_REDIS_URL'] = 'redis://localhost:6379/1' 
+redis_url = os.getenv('REDIS_URL') or 'redis://localhost:6379/0'
+app.config['CACHE_TYPE'] = 'RedisCache' if os.getenv('REDIS_URL') else 'SimpleCache'
+app.config['CACHE_REDIS_URL'] = redis_url
 cache = Cache(app)
 
 
@@ -67,8 +85,8 @@ def make_celery(app):
     celery = Celery(app.import_name)
     
     celery.conf.update(
-        broker_url='redis://localhost:6379/0',
-        result_backend='redis://localhost:6379/0',
+        broker_url=redis_url,
+        result_backend=redis_url,
         timezone='UTC'
     )
 
@@ -1717,4 +1735,4 @@ PDF_REPORT_TEMPLATE = """<!DOCTYPE html>
 celery_app = celery 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', '5000')), debug=False)

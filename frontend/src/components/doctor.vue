@@ -382,10 +382,10 @@ export default {
             }
         },
         async fetchData() {
-            const res = await fetch('http://127.0.0.1:5000/api/doctor/dashboard', { headers: this.authHeader() });
+            const res = await fetch('/api/doctor/dashboard', { headers: this.authHeader() });
             if (res.ok) this.appointments = await res.json();
             
-            const res2 = await fetch('http://127.0.0.1:5000/api/doctor/profile', { headers: this.authHeader() });
+            const res2 = await fetch('/api/doctor/profile', { headers: this.authHeader() });
             if (res2.ok) {
                 const profile = await res2.json();
                 this.doctorName = profile.name;
@@ -396,7 +396,7 @@ export default {
             this.fetchPatients();
         },
         async updateAvailability() {
-            const res = await fetch('http://127.0.0.1:5000/api/doctor/availability', {
+            const res = await fetch('/api/doctor/availability', {
                 method: 'PUT', headers: this.authHeader(), body: JSON.stringify({ 
                     availability: this.availability,
                     time_availability: this.time_availability 
@@ -417,7 +417,7 @@ export default {
         },
         async saveTreatment() {
             const payload = { appointment_id: this.activeApptId, ...this.treatment };
-            const res = await fetch('http://127.0.0.1:5000/api/doctor/treatment', {
+            const res = await fetch('/api/doctor/treatment', {
                 method: 'POST', headers: this.authHeader(), body: JSON.stringify(payload)
             });
             if (res.ok) {
@@ -433,12 +433,12 @@ export default {
             }
         },
         async fetchPatients() {
-            const res = await fetch('http://127.0.0.1:5000/api/doctor/patients', { headers: this.authHeader() });
+            const res = await fetch('/api/doctor/patients', { headers: this.authHeader() });
             if (res.ok) this.patients = await res.json();
         },
         async cancelAppt(id) {
             if (confirm("Are you sure you want to cancel this appointment?")) {
-                const res = await fetch('http://127.0.0.1:5000/api/doctor/appointment/' + id, {
+                const res = await fetch('/api/doctor/appointment/' + id, {
                     method: 'PATCH', headers: this.authHeader(), body: JSON.stringify({ status: 'Cancelled' })
                 });
                 if (res.ok) { this.showMsg('success', "Appointment cancelled"); this.fetchData(); }
@@ -447,7 +447,7 @@ export default {
         },
         async viewPatientHistory(pat) {
             this.selectedPatient = pat;
-            const res = await fetch('http://127.0.0.1:5000/api/patient/' + pat.patient_id + '/history', { headers: this.authHeader() });
+            const res = await fetch('/api/patient/' + pat.patient_id + '/history', { headers: this.authHeader() });
             if (res.ok) {
                 const data = await res.json();
                 this.patientHistory = data.history;

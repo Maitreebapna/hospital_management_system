@@ -1098,16 +1098,16 @@ export default {
 
         async fetchData() {
             try {
-                const res1 = await fetch('http://127.0.0.1:5000/api/admin/dashboard', { headers: this.authHeader() });
+                const res1 = await fetch('/api/admin/dashboard', { headers: this.authHeader() });
                 this.stats = await res1.json();
 
-                const res2 = await fetch('http://127.0.0.1:5000/api/admin/appointments', { headers: this.authHeader() });
+                const res2 = await fetch('/api/admin/appointments', { headers: this.authHeader() });
                 this.appointments = await res2.json();
 
-                const res3 = await fetch('http://127.0.0.1:5000/api/admin/doctors', { headers: this.authHeader() });
+                const res3 = await fetch('/api/admin/doctors', { headers: this.authHeader() });
                 this.doctors = await res3.json();
 
-                const res4 = await fetch('http://127.0.0.1:5000/api/admin/patients', { headers: this.authHeader() });
+                const res4 = await fetch('/api/admin/patients', { headers: this.authHeader() });
                 const patientsData = await res4.json();
                 this.patients = patientsData.map(p => ({ ...p, isEditing: false }));
 
@@ -1348,11 +1348,11 @@ export default {
 
         async openViewPatientModal(pat) {
             try {
-                const res = await fetch('http://127.0.0.1:5000/api/admin/patients/' + pat.id, { headers: this.authHeader() });
+                const res = await fetch('/api/admin/patients/' + pat.id, { headers: this.authHeader() });
                 if (res.ok) {
                     const detail = await res.json();
                     // Fetch specific booking history from dedicated history endpoint
-                    const resHistory = await fetch('http://127.0.0.1:5000/api/admin/patients/' + pat.id + '/history', { headers: this.authHeader() });
+                    const resHistory = await fetch('/api/admin/patients/' + pat.id + '/history', { headers: this.authHeader() });
                     if (resHistory.ok) {
                         const historyData = await resHistory.json();
                         detail.history = historyData.history;
@@ -1372,7 +1372,7 @@ export default {
             try {
                 const newStatus = doc.status === 'Active' ? 'Unavailable' : 'Active';
                 const payload = { status: newStatus };
-                const res = await fetch('http://127.0.0.1:5000/api/admin/doctors/' + doc.id, {
+                const res = await fetch('/api/admin/doctors/' + doc.id, {
                     method: 'PUT',
                     headers: this.authHeader(),
                     body: JSON.stringify(payload)
@@ -1405,7 +1405,7 @@ export default {
                     consultation_fee: parseFloat(this.newDoctor.consultation_fee || 50.0),
                     contact: this.newDoctor.contact
                 };
-                const res = await fetch('http://127.0.0.1:5000/api/admin/doctors', {
+                const res = await fetch('/api/admin/doctors', {
                     method: 'POST', headers: this.authHeader(), body: JSON.stringify(payload)
                 });
                 const data = await res.json();
@@ -1435,7 +1435,7 @@ export default {
                     consultation_fee: parseFloat(this.selectedDoctor.consultation_fee || 50.0),
                     status: this.selectedDoctor.status
                 };
-                const res = await fetch('http://127.0.0.1:5000/api/admin/doctors/' + this.selectedDoctor.id, {
+                const res = await fetch('/api/admin/doctors/' + this.selectedDoctor.id, {
                     method: 'PUT', headers: this.authHeader(), body: JSON.stringify(payload)
                 });
                 if (res.ok) {
@@ -1453,7 +1453,7 @@ export default {
 
         async submitEditPatient() {
             try {
-                const res = await fetch('http://127.0.0.1:5000/api/admin/patients/' + this.selectedPatient.id, {
+                const res = await fetch('/api/admin/patients/' + this.selectedPatient.id, {
                     method: 'PUT', headers: this.authHeader(), body: JSON.stringify(this.selectedPatient)
                 });
                 if (res.ok) {
@@ -1472,7 +1472,7 @@ export default {
         async deactivateDoctor(doc) {
             if (confirm(`Are you sure you want to deactivate ${doc.name}? Their profile will show as Unavailable.`)) {
                 try {
-                    const res = await fetch(`http://127.0.0.1:5000/api/admin/doctors/${doc.id}?action=deactivate`, {
+                    const res = await fetch(`/api/admin/doctors/${doc.id}?action=deactivate`, {
                         method: 'DELETE', headers: this.authHeader()
                     });
                     if (res.ok) {
@@ -1491,7 +1491,7 @@ export default {
         async deleteDoctorPermanently(doc) {
             if (confirm(`DANGER: Permanently delete doctor ${doc.name} and their user login profile? This cannot be undone.`)) {
                 try {
-                    const res = await fetch(`http://127.0.0.1:5000/api/admin/doctors/${doc.id}?action=delete`, {
+                    const res = await fetch(`/api/admin/doctors/${doc.id}?action=delete`, {
                         method: 'DELETE', headers: this.authHeader()
                     });
                     if (res.ok) {
@@ -1510,7 +1510,7 @@ export default {
         async downloadPatientReport(patientId, patientName) {
             try {
                 this.showMsg('success', 'Preparing PDF download...');
-                const res = await fetch(`http://127.0.0.1:5000/api/admin/patients/${patientId}/export-history`, {
+                const res = await fetch(`/api/admin/patients/${patientId}/export-history`, {
                     headers: this.authHeader()
                 });
                 if (res.ok) {
@@ -1534,7 +1534,7 @@ export default {
 
         async searchDoctors() {
             if (!this.searchDocQuery) return;
-            const res = await fetch('http://127.0.0.1:5000/api/admin/doctors/search?q=' + this.searchDocQuery, { headers: this.authHeader() });
+            const res = await fetch('/api/admin/doctors/search?q=' + this.searchDocQuery, { headers: this.authHeader() });
             if (res.ok) {
                 this.docSearchResults = await res.json();
                 if (this.docSearchResults.length === 0) {
@@ -1545,7 +1545,7 @@ export default {
 
         async searchPatients() {
             if (!this.searchPatQuery) return;
-            const res = await fetch('http://127.0.0.1:5000/api/admin/patients/search?q=' + this.searchPatQuery, { headers: this.authHeader() });
+            const res = await fetch('/api/admin/patients/search?q=' + this.searchPatQuery, { headers: this.authHeader() });
             if (res.ok) {
                 const results = await res.json();
                 this.patSearchResults = results.map(p => ({ ...p, isEditing: false }));
@@ -1557,7 +1557,7 @@ export default {
 
         async removeUser(user_id) {
             if (confirm("DANGER: Permanently remove this profile? This will delete all logins and bookings associated with this user.")) {
-                const res = await fetch('http://127.0.0.1:5000/api/admin/user/' + user_id, { method: 'DELETE', headers: this.authHeader() });
+                const res = await fetch('/api/admin/user/' + user_id, { method: 'DELETE', headers: this.authHeader() });
                 if (res.ok) {
                     this.showMsg('success', "Profile removed from the hospital records.");
                     this.fetchData();
@@ -1570,13 +1570,13 @@ export default {
 
         async deleteAppt(id) {
             if (confirm("Erase this booking?")) {
-                await fetch('http://127.0.0.1:5000/api/admin/appointment/' + id, { method: 'DELETE', headers: this.authHeader() });
+                await fetch('/api/admin/appointment/' + id, { method: 'DELETE', headers: this.authHeader() });
                 this.fetchData(); 
             }
         },
 
         async updateAppointmentStatus(id, status) {
-            const res = await fetch('http://127.0.0.1:5000/api/appointments/' + id + '/status', {
+            const res = await fetch('/api/appointments/' + id + '/status', {
                 method: 'PATCH', headers: this.authHeader(), body: JSON.stringify({ status: status })
             });
             if (res.ok) {

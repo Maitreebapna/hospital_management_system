@@ -6,10 +6,13 @@ __pycache__/
 
 # Environment and Virtual Environments
 .env
+.env.*
+!.env.example
 venv.bak/
 myenv/
 .venv/
 env/
+node_modules/
 
 # SQLite Database
 *.db

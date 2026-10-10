@@ -149,7 +149,7 @@
                                         <div>
                                             <label class="form-label text-secondary small fw-bold">Preferred Time Slot</label>
                                             <div class="input-icon-wrapper">
-                                                <input type="text" class="form-control" v-model="bookForm.time_slot" placeholder="e.g. 10:30 AM" required>
+                                                <input type="text" class="form-control" v-model="bookForm.time_slot" required>
                                             </div>
                                         </div>
                                         
@@ -387,11 +387,11 @@ export default {
         },
         
         async fetchHistory() {
-            const res = await fetch('http://127.0.0.1:5000/api/patient/history', { headers: this.authHeader() });
+            const res = await fetch('/api/patient/history', { headers: this.authHeader() });
             if (res.ok) this.history = await res.json();
         },
         async fetchDepartments() {
-            const res = await fetch('http://127.0.0.1:5000/api/departments');
+            const res = await fetch('/api/departments');
             if (res.ok) this.departments = await res.json();
         },
         showMsg(type, msg) {
@@ -405,7 +405,7 @@ export default {
         },
         async searchDoctors() {
             this.error = '';
-            const res = await fetch('http://127.0.0.1:5000/api/patient/doctors/search?q=' + this.searchQuery, { headers: this.authHeader() });
+            const res = await fetch('/api/patient/doctors/search?q=' + this.searchQuery, { headers: this.authHeader() });
             if (res.ok) this.searchResults = await res.json();
         },
         async bookAppt() {
@@ -419,7 +419,7 @@ export default {
 
             const payload = { doctor_id: this.targetDoctor.id, ...this.bookForm };
             try {
-                const res = await fetch('http://127.0.0.1:5000/api/payments/create-order', {
+                const res = await fetch('/api/payments/create-order', {
                     method: 'POST', headers: this.authHeader(), body: JSON.stringify(payload)
                 });
                 const data = await res.json();
@@ -449,7 +449,7 @@ export default {
                     transaction_id: transactionId,
                     cardholder_name: this.cardForm.cardholder
                 };
-                const res = await fetch('http://127.0.0.1:5000/api/payments/verify', {
+                const res = await fetch('/api/payments/verify', {
                     method: 'POST', headers: this.authHeader(), body: JSON.stringify(payload)
                 });
                 const data = await res.json();
@@ -469,7 +469,7 @@ export default {
             }
         },
         async exportData() {
-            const res = await fetch('http://127.0.0.1:5000/api/patient/export-history', { method: 'POST', headers: this.authHeader() });
+            const res = await fetch('/api/patient/export-history', { method: 'POST', headers: this.authHeader() });
             if (res.ok) {
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);
@@ -486,7 +486,7 @@ export default {
         },
         async triggerCSVExport() {
             try {
-                const res = await fetch('http://127.0.0.1:5000/api/patient/export-csv', { method: 'POST', headers: this.authHeader() });
+                const res = await fetch('/api/patient/export-csv', { method: 'POST', headers: this.authHeader() });
                 const data = await res.json();
                 if (res.ok) {
                     this.showMsg('success', data.message);
@@ -498,7 +498,7 @@ export default {
             }
         },
         async updateProfile() {
-            const res = await fetch('http://127.0.0.1:5000/api/patient/profile', {
+            const res = await fetch('/api/patient/profile', {
                 method: 'PUT', headers: this.authHeader(), body: JSON.stringify(this.profileForm)
             });
             if (res.ok) { 
@@ -521,7 +521,7 @@ export default {
                 return;
             }
 
-            const res = await fetch('http://127.0.0.1:5000/api/patient/appointment/' + this.rescheduleData.id, {
+            const res = await fetch('/api/patient/appointment/' + this.rescheduleData.id, {
                 method: 'PATCH',
                 headers: this.authHeader(),
                 body: JSON.stringify({
@@ -540,7 +540,7 @@ export default {
         },
         async cancelAppt(id) {
             if (confirm("Are you sure you want to cancel this appointment?")) {
-                const res = await fetch('http://127.0.0.1:5000/api/patient/appointment/' + id, {
+                const res = await fetch('/api/patient/appointment/' + id, {
                     method: 'PATCH', headers: this.authHeader(), body: JSON.stringify({ status: 'Cancelled' })
                 });
                 if (res.ok) { this.showMsg('success', "Appointment cancelled!"); this.fetchHistory(); }
