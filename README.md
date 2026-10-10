@@ -7,52 +7,53 @@ A dynamic, full-stack Hospital Management platform designed to streamline medica
 - **Frontend:** Vue3, Bootstrap 5
 - **Async Execution:** Celery (Worker & Beat)
 
-##  Project Setup
+## Project Setup (Windows PowerShell)
 
 ### 1. Requirements
-Ensure you have **Redis** installed and running on your system (Default port `6379`).
+Install Python and Redis, and make sure Redis is running on `127.0.0.1:6379`.
 
 ### 2. Installation
-1. Clone the repository.
-2. Initialize a virtual environment:
+From the project root, create a virtual environment and install dependencies:
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
+   py -m venv .venv
+   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
    ```
 
 ### 3. Database Initialization
-Run the initialization script to set up the SQLite database and create the default Admin account.
+Run this once from the project root to set up the SQLite database and default Admin account:
 ```bash
-cd backend
-python init_db.py
+.\.venv\Scripts\python.exe .\backend\init_db.py
 ```
 **Admin Credentials:**
 - Email: `admin@hms.com`
 - Password: `admin123`
 
-##  Running the Application
-To run the full system, you need to open **four terminal windows**:
+## Running the Application
+Open four PowerShell terminals in the project root. Start Redis first; the app uses it for caching and Celery jobs.
 
-1. **Redis Server**: Start your local Redis instance.
-2. **Flask Backend**:
+1. **Redis** (skip if the Redis service is already running):
    ```bash
-   cd backend
-   python app.py
+   redis-server
+   ```
+   If `redis-server` is not on `PATH`, start Redis using the executable or service installed on your machine.
+2. **Flask app**:
+   ```powershell
+   Set-Location .\backend
+   ..\.venv\Scripts\python.exe .\app.py
    ```
 3. **Celery Worker**:
-   ```bash
-   cd backend
-   celery -A app.celery_app worker --loglevel=info --pool=solo
+   ```powershell
+   Set-Location .\backend
+   ..\.venv\Scripts\celery.exe -A app.celery_app worker --loglevel=info --pool=solo
    ```
 4. **Celery Beat**:
-   ```bash
-   cd backend
-   celery -A app.celery_app beat --loglevel=info
+   ```powershell
+   Set-Location .\backend
+   ..\.venv\Scripts\celery.exe -A app.celery_app beat --loglevel=info
    ```
+   The worker and Beat are optional for the login and dashboards, but required for background and scheduled jobs.
+
+Open `http://127.0.0.1:5000/` in your browser. Sign in with the Admin credentials below, or register a patient account.
 
 ## Project Structure
 - `backend/`: Flask application, models, and background tasks.

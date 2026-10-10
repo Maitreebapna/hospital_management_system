@@ -693,6 +693,38 @@
                         </div>
                     </div>
                 </div>
+                <!-- Secondary Graphs Row (Moved from Overview) -->
+                <div class="row g-4 mt-4">
+                    <!-- Monthly Booking & Revenue Trends -->
+                    <div class="col-xl-6 col-12">
+                        <div class="card shadow-sm border-0 h-100">
+                            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                                <i class="bi bi-graph-up-arrow text-primary fs-5"></i>
+                                <h5 class="mb-0 fw-bold text-dark">Monthly Booking & Revenue Trends</h5>
+                            </div>
+                            <div class="card-body p-4 bg-white">
+                                <div style="width: 100%; height: 280px;" class="position-relative">
+                                    <canvas id="trendsChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Daily Appointment Volumes -->
+                    <div class="col-xl-6 col-12">
+                        <div class="card shadow-sm border-0 h-100">
+                            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                                <i class="bi bi-activity text-primary fs-5"></i>
+                                <h5 class="mb-0 fw-bold text-dark">Daily Appointment</h5>
+                            </div>
+                            <div class="card-body p-4 bg-white">
+                                <div style="width: 100%; height: 280px;" class="position-relative">
+                                    <canvas id="dailyVolumesChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
         </div>
@@ -1026,6 +1058,8 @@ export default {
             patients: [],
             showPassword: false,
             chartInstance: null,
+            trendsChartInstance: null,
+            dailyVolumesChartInstance: null,
             deptLoadChartInstance: null,
             isDarkMode: false,
             viewMode: 'grid',
@@ -1169,6 +1203,108 @@ export default {
                                     beginAtZero: true,
                                     ticks: { stepSize: 1 },
                                     grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+            // Render Monthly Trends Chart
+            const ctxTrends = document.getElementById('trendsChart');
+            if (ctxTrends) {
+                const months = (this.stats.monthly_trends || []).map(t => t.month);
+                const counts = (this.stats.monthly_trends || []).map(t => t.count);
+                
+                const revenueMap = {};
+                (this.stats.monthly_revenue || []).forEach(r => {
+                    revenueMap[r.month] = r.amount;
+                });
+                const revenues = months.map(m => revenueMap[m] || 0.0);
+
+                if (this.trendsChartInstance) {
+                    this.trendsChartInstance.data.labels = months;
+                    this.trendsChartInstance.data.datasets[0].data = counts;
+                    this.trendsChartInstance.data.datasets[1].data = revenues;
+                    this.trendsChartInstance.update();
+                } else {
+                    this.trendsChartInstance = new Chart(ctxTrends, {
+                        type: 'bar',
+                        data: {
+                            labels: months,
+                            datasets: [
+                                {
+                                    label: 'Visits Volume',
+                                    data: counts,
+                                    backgroundColor: '#7c73e6',
+                                    yAxisID: 'y'
+                                },
+                                {
+                                    label: 'Revenue (₹)',
+                                    data: revenues,
+                                    type: 'line',
+                                    borderColor: '#5ba2c8',
+                                    backgroundColor: 'transparent',
+                                    borderWidth: 3,
+                                    tension: 0.3,
+                                    yAxisID: 'y1'
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'left',
+                                    title: { display: true, text: 'Visits' }
+                                },
+                                y1: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    grid: { drawOnChartArea: false },
+                                    title: { display: true, text: 'Revenue (₹)' }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Render Daily Volumes Chart
+            const ctxDaily = document.getElementById('dailyVolumesChart');
+            if (ctxDaily) {
+                const dates = (this.stats.daily_volumes || []).map(d => d.date);
+                const counts = (this.stats.daily_volumes || []).map(d => d.count);
+
+                if (this.dailyVolumesChartInstance) {
+                    this.dailyVolumesChartInstance.data.labels = dates;
+                    this.dailyVolumesChartInstance.data.datasets[0].data = counts;
+                    this.dailyVolumesChartInstance.update();
+                } else {
+                    this.dailyVolumesChartInstance = new Chart(ctxDaily, {
+                        type: 'line',
+                        data: {
+                            labels: dates,
+                            datasets: [{
+                                label: 'Daily Bookings',
+                                data: counts,
+                                borderColor: '#5f8a75',
+                                backgroundColor: 'rgba(95, 138, 117, 0.1)',
+                                fill: true,
+                                borderWidth: 3,
+                                tension: 0.3
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { stepSize: 1 }
                                 }
                             }
                         }
@@ -1544,7 +1680,7 @@ export default {
     },
     watch: {
         currentTab(newTab) {
-            if (newTab === 'overview') {
+            if (newTab === 'overview' || newTab === 'patients') {
                 this.$nextTick(() => {
                     this.renderChart();
                 });
